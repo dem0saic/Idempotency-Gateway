@@ -1,0 +1,15 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# OS
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Environment
+.env
+*.local
