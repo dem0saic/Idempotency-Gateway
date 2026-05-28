@@ -1,3 +1,104 @@
+# Idempotency-Gateway
+
+> **Note:** This README is being written incrementally during development.
+> The original assignment brief is preserved below for reference and will
+> be replaced before submission.
+
+## Architecture (in progress)
+
+The decision flow the server follows for each incoming request:
+
+```mermaid
+---
+config:
+  theme: neo-dark
+---
+flowchart TD
+    Start([Request arrives at POST /process-payment]) --> CheckHeader{Has Idempotency-Key header?}
+    CheckHeader -- No --> Reject400Header[Return 400 Bad Request<br/>Missing header]
+    CheckHeader -- Yes --> CheckBody{Body is valid JSON<br/>with required fields?}
+    CheckBody -- No --> Reject400Body[Return 400 Bad Request<br/>Invalid body]
+    CheckBody -- Yes --> LookupKey{Key exists in store?}
+
+    LookupKey -- No --> Reserve[Reserve key in store<br/>status = IN_FLIGHT]
+    Reserve --> Process[Process payment<br/>2-second delay]
+    Process --> Complete[Update store with response<br/>status = COMPLETED]
+    Complete --> Return201Fresh[Return 201 Created<br/>X-Cache-Hit: false]
+
+    LookupKey -- Yes --> CheckBodyMatch{Stored body matches<br/>current body?}
+    CheckBodyMatch -- No --> Reject422[Return 422 Unprocessable Entity<br/>Key reused with different body]
+    CheckBodyMatch -- Yes --> CheckStatus{Current status?}
+
+    CheckStatus -- IN_FLIGHT --> Wait[Wait for completion]
+    Wait --> ReplayAfterWait[Replay cached response<br/>X-Cache-Hit: true]
+    CheckStatus -- COMPLETED --> Replay[Replay cached response<br/>X-Cache-Hit: true]
+```
+
+---
+
+(everything that was already in the README continues here unchanged)
+
+## Sequence Diagrams
+
+### Scenario 1: Happy path with a retry
+```mermaid
+sequenceDiagram
+    actor C as Client
+    participant G as Gateway
+    participant S@{ "type": "database" } as Store
+
+    Note over C,G: First request — fresh
+    C->>G: POST /process-payment<br/>Idempotency-Key: order-42<br/>body: {amount: 100}
+    G->>S: Check key "order-42"
+    S-->>G: Not found
+    G->>S: Reserve key as IN_FLIGHT
+    G->>G: Process payment (2s)
+    G->>S: Store response, mark COMPLETED
+    G-->>C: 201 Created<br/>X-Cache-Hit: false<br/>transaction_id: txn_abc123
+
+    Note over C,G: Network glitch — client never received response<br/>Client retries
+    C->>G: POST /process-payment<br/>Idempotency-Key: order-42<br/>body: {amount: 100}
+    G->>S: Check key "order-42"
+    S-->>G: Found, status COMPLETED, body matches
+    G-->>C: 201 Created<br/>X-Cache-Hit: true<br/>transaction_id: txn_abc123
+```
+
+### Scenario 2: Concurrent duplicate (in-flight collision)    
+```mermaid
+sequenceDiagram
+    actor A as Client A
+    actor B as Client B
+    participant G as Gateway
+    participant S@{ "type": "database" } as Store
+
+    Note over A,B: Two simultaneous requests with the same key
+
+    A->>G: POST /process-payment<br/>Key: order-99
+    G->>S: Check key "order-99"
+    S-->>G: Not found
+    G->>S: Reserve as IN_FLIGHT (event created)
+    G->>G: Begin processing (2s)
+
+    Note right of B: B arrives 100ms later
+
+    B->>G: POST /process-payment<br/>Key: order-99
+    G->>S: Check key "order-99"
+    S-->>G: Found, status IN_FLIGHT
+    G->>G: Block on event<br/>(wait for A's completion)
+
+    G->>S: A finishes, update with response, mark COMPLETED
+    G->>G: Signal event<br/>(wake all waiters)
+    G-->>A: 201 Created<br/>X-Cache-Hit: false<br/>transaction_id: txn_xyz789
+
+    G->>S: B retrieves the now-stored response
+    G-->>B: 201 Created<br/>X-Cache-Hit: true<br/>transaction_id: txn_xyz789
+```
+
+
+
+## Original Assignment Brief
+
+
 # Idempotency-Gateway (The "Pay-Once" Protocol)
 This challenge is designed to test your ability to bridge Computer Science fundamentals with Modern Backend Engineering.
 
