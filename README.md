@@ -34,10 +34,6 @@ flowchart TD
     CheckStatus -- COMPLETED --> Replay[Replay cached response<br/>X-Cache-Hit: true]
 ```
 
----
-
-(everything that was already in the README continues here unchanged)
-
 ## Sequence Diagrams
 
 ### Scenario 1: Happy path with a retry
@@ -95,9 +91,9 @@ sequenceDiagram
 ```
 
 
-
+---
 ## Original Assignment Brief
-
+(everything that was already in the README continues here unchanged)
 
 # Idempotency-Gateway (The "Pay-Once" Protocol)
 This challenge is designed to test your ability to bridge Computer Science fundamentals with Modern Backend Engineering.
