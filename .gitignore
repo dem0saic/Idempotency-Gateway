@@ -14,9 +14,5 @@ Thumbs.db
 .env
 *.local
 
-# Local test artifacts
-*.json
-!package.json
-
 # Local test bodies
 body*.json
