@@ -13,3 +13,10 @@ Thumbs.db
 # Environment
 .env
 *.local
+
+# Local test artifacts
+*.json
+!package.json
+
+# Local test bodies
+body*.json
