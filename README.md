@@ -11,27 +11,26 @@ The decision flow the server follows for each incoming request:
 ```mermaid
 ---
 config:
-  theme: neo-dark
+  layout: elk
 ---
-flowchart TD
-    Start([Request arrives at POST /process-payment]) --> CheckHeader{Has Idempotency-Key header?}
-    CheckHeader -- No --> Reject400Header[Return 400 Bad Request<br/>Missing header]
-    CheckHeader -- Yes --> CheckBody{Body is valid JSON<br/>with required fields?}
-    CheckBody -- No --> Reject400Body[Return 400 Bad Request<br/>Invalid body]
-    CheckBody -- Yes --> LookupKey{Key exists in store?}
-
-    LookupKey -- No --> Reserve[Reserve key in store<br/>status = IN_FLIGHT]
-    Reserve --> Process[Process payment<br/>2-second delay]
-    Process --> Complete[Update store with response<br/>status = COMPLETED]
-    Complete --> Return201Fresh[Return 201 Created<br/>X-Cache-Hit: false]
-
-    LookupKey -- Yes --> CheckBodyMatch{Stored body matches<br/>current body?}
-    CheckBodyMatch -- No --> Reject422[Return 422 Unprocessable Entity<br/>Key reused with different body]
-    CheckBodyMatch -- Yes --> CheckStatus{Current status?}
-
-    CheckStatus -- IN_FLIGHT --> Wait[Wait for completion]
-    Wait --> ReplayAfterWait[Replay cached response<br/>X-Cache-Hit: true]
-    CheckStatus -- COMPLETED --> Replay[Replay cached response<br/>X-Cache-Hit: true]
+flowchart TB
+    Start(["Request arrives at POST /process-payment"]) --> CheckHeader{"Has Idempotency-Key header?"}
+    CheckHeader -- No --> Reject400Header["Return 400 Bad Request<br>Missing header"]
+    CheckHeader -- Yes --> CheckBody{"Body is valid JSON<br>with required fields?"}
+    CheckBody -- No --> Reject400Body["Return 400 Bad Request<br>Invalid body"]
+    CheckBody -- Yes --> LookupKey{"Key exists in store?"}
+    LookupKey -- No --> Reserve["Reserve key in store<br>status = IN_FLIGHT"]
+    Reserve --> Process["Process payment<br>2-second delay"]
+    Process --> Complete["Update store with response<br>status = COMPLETED"]
+    Complete --> Return201Fresh["Return 201 Created<br>X-Cache-Hit: false"]
+    LookupKey -- Yes --> CheckExpired{"Record expired?<br>age &gt; 24 hours"}
+    CheckExpired -- Yes --> Reserve
+    CheckExpired -- No --> CheckBodyMatch{"Stored body matches<br>current body?"}
+    CheckBodyMatch -- No --> Reject422["Return 422 Unprocessable Entity<br>Key reused with different body"]
+    CheckBodyMatch -- Yes --> CheckStatus{"Current status?"}
+    CheckStatus -- IN_FLIGHT --> Wait["Wait for completion"]
+    Wait --> ReplayAfterWait["Replay cached response<br>X-Cache-Hit: true"]
+    CheckStatus -- COMPLETED --> Replay["Replay cached response<br>X-Cache-Hit: true"]
 ```
 
 ## Sequence Diagrams
