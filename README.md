@@ -4,9 +4,19 @@ A small HTTP service that guarantees a payment is processed exactly once, even w
 
 The service accepts payment requests at `POST /process-payment`. Each request carries an `Idempotency-Key` header chosen by the client. If a request with the same key arrives more than once, the service returns the original response instead of processing the payment again. If two requests with the same key arrive concurrently, only one is processed and the others wait for its result. If the same key is used with a different body, the request is rejected as a contract violation.
 
+## Features
+
+- **Idempotent payment processing.** Same `Idempotency-Key` returns the same response on retry, never charges twice.
+- **Conflict detection.** Reusing a key with a different body returns `422 Unprocessable Entity`.
+- **Single-flight concurrency.** Simultaneous duplicate requests block on the original and replay its result; verified with a 25-thread concurrency test.
+- **24-hour TTL on idempotency keys.** Bounds memory growth and caps the replay-attack window.
+- **Structured audit logging.** Every routing decision (`NEW_REQUEST`, `REPLAY_CACHED`, `CONFLICT_422`, `WAIT_FOR_INFLIGHT`, `EXPIRED_PURGED`) is logged with timestamp, key, and client IP.
+- **`X-Cache-Hit` response header.** Signals whether the response was freshly computed or replayed from cache.
+
 ## Contents
 
 - [Overview](#idempotency-gateway)
+- [Features](#features)
 - [Setup](#setup)
 - [Project Structure](#project-structure)
 - [API](#api)
