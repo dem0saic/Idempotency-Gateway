@@ -14,5 +14,6 @@ Thumbs.db
 .env
 *.local
 
-# Local test bodies
-body*.json
+# Local test artifacts
+*body*.json
+race_test_output*.txt
